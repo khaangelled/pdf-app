@@ -1,2 +1,2 @@
-streamlit==1.46.1
-ironpdf==2025.7.9
+streamlit
+ironpdf
