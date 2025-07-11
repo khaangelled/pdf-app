@@ -14,9 +14,11 @@ st.markdown("Upload a PDF, view it, add text annotations, and draw on it.")
 # Upload a PDF file
 uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
 
-# Session state to hold the PDF document
+# Session state to hold the PDF document and temporary file path
 if 'doc' not in st.session_state:
     st.session_state.doc = None
+if 'temp_pdf_path' not in st.session_state:
+    st.session_state.temp_pdf_path = "temp.pdf"
 
 # Check if a PDF is uploaded
 if uploaded_file is not None:
@@ -45,7 +47,7 @@ if uploaded_file is not None:
         if text_to_add:
             page = st.session_state.doc.load_page(st.session_state.page_number)
             page.insert_text((100, 100), text_to_add, fontsize=12, color=(0, 0, 0))
-            st.session_state.doc.save("temp.pdf")
+            st.session_state.doc.save(st.session_state.temp_pdf_path)
             st.success("Text added successfully!")
         else:
             st.warning("Please enter text to add to the PDF.")
@@ -76,13 +78,13 @@ if uploaded_file is not None:
                 page.draw_lines(points, color=(255, 0, 0), width=2)
         
         # Save the updated PDF with drawings
-        st.session_state.doc.save("temp.pdf")
+        st.session_state.doc.save(st.session_state.temp_pdf_path)
         st.success("Drawing updated!")
 
     # Download the modified PDF
     st.download_button(
         label="Download the modified PDF",
-        data=open("temp.pdf", "rb").read(),
+        data=open(st.session_state.temp_pdf_path, "rb").read(),
         file_name="edited_output.pdf",
         mime="application/pdf"
     )
