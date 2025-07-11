@@ -2,6 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF
 from PIL import Image
 import io
+from streamlit_drawable_canvas import st_canvas
 
 # Title of the app
 st.title("Live PDF Editor with Streamlit")
@@ -43,27 +44,32 @@ if uploaded_file is not None:
         else:
             st.warning("Please enter text to add to the PDF.")
 
-    # Canvas for Drawing Annotations
+    # Canvas for Drawing Annotations using `streamlit-drawable-canvas`
     st.subheader("Draw on the PDF:")
-    drawing = st.canvas(
+
+    # Create a canvas for free drawing
+    canvas_result = st_canvas(
         fill_color="rgba(255, 165, 0, 0.3)",  # Transparent drawing color
-        width=800,
-        height=600,
+        width=img.width,
+        height=img.height,
         drawing_mode="freedraw",
         key="drawing",
+        background_image=img,
+        stroke_width=3,
+        stroke_color="black",
+        display_toolbar=True,
     )
 
-    if drawing:
-        # Get the drawing coordinates and convert to page coordinates
-        coords = drawing.json_data["objects"]
+    # If there is any drawing, get coordinates and apply them to the PDF
+    if canvas_result.json_data is not None:
+        coords = canvas_result.json_data["objects"]
         for coord in coords:
             if coord["type"] == "path":
                 points = coord["path"]
-                # Draw on the PDF using PyMuPDF (fitz)
                 page = st.session_state.doc.load_page(st.session_state.page_number)
                 page.draw_lines(points, color=(255, 0, 0), width=2)
         
-        # Save the updated PDF
+        # Save the updated PDF with drawings
         st.session_state.doc.save("temp.pdf")
         st.success("Drawing updated!")
 
