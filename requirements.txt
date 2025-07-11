@@ -1,3 +1,4 @@
 streamlit
 pymupdf
 streamlit-drawable-canvas>=0.1.2
+Pillow
