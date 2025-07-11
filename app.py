@@ -3,6 +3,7 @@ import fitz  # PyMuPDF
 from PIL import Image
 import io
 
+# إعداد واجهة المستخدم
 st.title("PDF Viewer and Editor")
 
 # تحميل ملف PDF
