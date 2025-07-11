@@ -1,68 +1,80 @@
 import streamlit as st
-import fitz  # PyMuPDF
-from PIL import Image
+import base64
 import io
+from PIL import Image
 
-# إعداد واجهة المستخدم
-st.title("PDF Viewer and Editor")
+# Title
+st.title("Interactive PDF Editor")
 
-# تحميل ملف PDF
-uploaded_file = st.file_uploader("اختر ملف PDF", type=["pdf"])
+# Upload PDF file
+uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
 
 if uploaded_file is not None:
-    # فتح ملف PDF
-    doc = fitz.open(stream=uploaded_file.getvalue(), filetype="pdf")
+    # Display PDF as image or use pdf.js (We'll use PDF.js embedded in HTML/JS below)
     
-    # عرض الصفحات
-    page_num = st.slider("اختر رقم الصفحة", 1, len(doc), 1)
-    page = doc.load_page(page_num - 1)
+    # Embed PDF.js with HTML and JS
+    pdf_data = base64.b64encode(uploaded_file.read()).decode('utf-8')  # convert file to base64
     
-    # تحويل الصفحة إلى صورة لعرضها في Streamlit
-    pix = page.get_pixmap()
-    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    
-    # عرض الصورة
-    st.image(img, caption="Page {}".format(page_num))
-    
-    # إضافة مربع نص أو تعليق (تفاعل مباشر مع الصفحة)
-    st.subheader("أضف تعليقًا أو نصًا")
-    
-    # نعرض قائمة الأدوات في الأعلى
-    selected_tool = st.selectbox("اختر الأداة", ["أداة النص", "أداة الإبراز", "أداة التوقيع"])
-    
-    if selected_tool == "أداة النص":
-        # تحديد مكان النص الذي نريد إضافته
-        x_pos = st.slider("الموضع الأفقي للنص", 0, pix.width, 100)
-        y_pos = st.slider("الموضع الرأسي للنص", 0, pix.height, 100)
-        text = st.text_input("اكتب النص الذي تريد إضافته:")
-        
-        if text:
-            # إضافة النص إلى الصفحة
-            rect = fitz.Rect(x_pos, y_pos, x_pos + 200, y_pos + 30)
-            page.insert_text(rect.tl, text, fontsize=12)
-            doc.save("output_with_text.pdf")
+    # HTML template to load PDF and add interactivity
+    pdf_html = f"""
+    <html>
+        <body>
+            <h1>PDF Viewer & Editor</h1>
+            <canvas id="pdf-canvas" width="800" height="600"></canvas>
+            <div>
+                <label for="add-text">Add Text:</label>
+                <input type="text" id="add-text" placeholder="Enter text here" />
+                <button onclick="addText()">Add Text to PDF</button>
+            </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+            <script>
+                var pdfData = atob("{pdf_data}"); // Decode base64 data
+                var canvas = document.getElementById('pdf-canvas');
+                var ctx = canvas.getContext('2d');
+                var pdfDoc = null;
+                var pageNum = 1;
+                var pageRendering = false;
+                var pageNumPending = null;
 
-    elif selected_tool == "أداة الإبراز":
-        highlight_text = st.text_input("اكتب النص للإبراز:")
-        if highlight_text:
-            # البحث عن النص وتحديده للإبراز
-            text_instances = page.search_for(highlight_text)
-            for inst in text_instances:
-                page.add_highlight_annot(inst)
-            doc.save("output_with_highlight.pdf")
+                // Load the PDF
+                function renderPage(num) {
+                    pageRendering = true;
+                    pdfDoc.getPage(num).then(function(page) {
+                        var viewport = page.getViewport({ scale: 1 });
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        var renderContext = {
+                            canvasContext: ctx,
+                            viewport: viewport
+                        };
+                        page.render(renderContext).promise.then(function() {
+                            pageRendering = false;
+                            if (pageNumPending !== null) {
+                                renderPage(pageNumPending);
+                                pageNumPending = null;
+                            }
+                        });
+                    });
+                }
 
-    elif selected_tool == "أداة التوقيع":
-        signature = st.file_uploader("رفع توقيعك", type=["png", "jpg"])
-        if signature is not None:
-            signature_img = Image.open(signature)
-            signature_bytes = io.BytesIO()
-            signature_img.save(signature_bytes, format="PNG")
-            
-            # إضافة التوقيع
-            page.insert_image(fitz.Rect(50, 150, 150, 250), stream=signature_bytes.getvalue())
-            doc.save("output_with_signature.pdf")
+                pdfjsLib.getDocument({data: pdfData}).promise.then(function(pdf) {
+                    pdfDoc = pdf;
+                    renderPage(pageNum);
+                });
 
-    # تحميل النسخ المعدلة
-    st.download_button("تحميل PDF مع النصوص", data=open("output_with_text.pdf", "rb").read(), file_name="output_with_text.pdf")
-    st.download_button("تحميل PDF مع الإبراز", data=open("output_with_highlight.pdf", "rb").read(), file_name="output_with_highlight.pdf")
-    st.download_button("تحميل PDF مع التوقيع", data=open("output_with_signature.pdf", "rb").read(), file_name="output_with_signature.pdf")
+                // Add text on canvas
+                function addText() {
+                    var text = document.getElementById('add-text').value;
+                    var x = Math.random() * canvas.width;
+                    var y = Math.random() * canvas.height;
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText(text, x, y);
+                }
+            </script>
+        </body>
+    </html>
+    """
+
+    # Render HTML content in Streamlit app
+    st.components.v1.html(pdf_html, height=800)
