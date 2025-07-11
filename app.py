@@ -3,6 +3,7 @@ import fitz  # PyMuPDF
 from PIL import Image
 import io
 from streamlit_drawable_canvas import st_canvas
+import tempfile
 
 # Title of the app
 st.title("Live PDF Editor with Streamlit")
@@ -27,6 +28,11 @@ if uploaded_file is not None:
     page = st.session_state.doc.load_page(st.session_state.page_number)
     pix = page.get_pixmap()
     img = Image.open(io.BytesIO(pix.tobytes("png")))
+
+    # Save the image to a temporary file to use in st_canvas
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmpfile:
+        img.save(tmpfile, format="PNG")
+        tmpfile_path = tmpfile.name
 
     # Show the image of the first page in Streamlit
     st.image(img)
@@ -54,7 +60,7 @@ if uploaded_file is not None:
         height=img.height,
         drawing_mode="freedraw",
         key="drawing",
-        background_image=img,
+        background_image=tmpfile_path,  # Pass the temp image path
         stroke_width=3,
         stroke_color="black",
         display_toolbar=True,
